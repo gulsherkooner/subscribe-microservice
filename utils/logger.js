@@ -8,7 +8,7 @@ const logger = winston.createLogger({
   ),
   transports: [
     new winston.transports.Console(),
-    new winston.transports.File({ filename: 'logs/followers-service.log' }),
+    new winston.transports.File({ filename: 'followers-service.log' }),
   ],
 });
 

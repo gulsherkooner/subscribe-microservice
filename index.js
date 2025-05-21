@@ -2,9 +2,8 @@ const express = require('express');
 const mongoose = require("mongoose")
 const dotenv = require('dotenv');
 dotenv.config();
-const logger = require('./utils/logger');
 const followerRoutes = require('./routes/followers');
-// const redis = require('./config/redis');
+const cors = require('./config/cors');
 
 
 const app = express();
@@ -12,6 +11,7 @@ const PORT = process.env.PORT || 3005;
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/post_service';
 
 // Middleware
+app.use(cors)
 app.use(express.json());
 
 // Routes
