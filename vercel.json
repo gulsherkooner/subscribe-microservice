@@ -1,0 +1,61 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "index.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/",
+      "dest": "index.js"
+    },
+    {
+      "src": "/followers",
+      "dest": "index.js"
+    },
+    {
+      "src": "/followers/:target_userid",
+      "dest": "index.js"
+    },
+    {
+      "src": "/followers/check/:target_userid",
+      "dest": "index.js"
+    },
+
+
+
+    {
+      "src": "/(.*)",
+      "dest": "index.js"
+    },
+    {
+      "src": "/followers/(.*)",
+      "dest": "index.js"
+    },
+    {
+      "src": "/followers/:target_userid/(.*)",
+      "dest": "index.js"
+    },
+    {
+      "src": "/followers/check/:target_userid/(.*)",
+      "dest": "index.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "index.js",
+      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+      "headers": {
+        "Access-Control-Allow-Origin": "https://api-gateway-eta-navy.vercel.app, https://next-frontend-one-xi.vercel.app, http://localhost:3001",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "X-Requested-With, Content-Type, Authorization",
+        "Access-Control-Allow-Credentials": "true",
+        "Access-Control-Max-Age": "86400"
+      }
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  }
+}
