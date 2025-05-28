@@ -2,11 +2,12 @@ const express = require("express");
 const redis = require("../config/redis");
 const logger = require("../utils/logger");
 const Follower = require("../models/follower");
-const axios = require("axios");
+const { v4: uuidv4 } = require("uuid");
 
 const router = express.Router();
 
 const authServiceUrl = process.env.AUTH_SERVICE_URL || "http://localhost:3002";
+
 const fetchAuth = async (route, method, user_id, body = null) => {
   try {
     const options = {
@@ -18,7 +19,6 @@ const fetchAuth = async (route, method, user_id, body = null) => {
       credentials: "include",
     };
 
-    // Only add body for methods that support it and when body is provided
     if (
       body &&
       ["POST", "PUT", "PATCH", "DELETE"].includes(method.toUpperCase())
@@ -28,20 +28,17 @@ const fetchAuth = async (route, method, user_id, body = null) => {
 
     const response = await fetch(`${authServiceUrl}/${route}`, options);
 
-    // Throw error for non-2xx responses
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(`HTTP ${response.status}: ${errorText}`);
     }
 
-    // Attempt to parse JSON, fallback to text if parsing fails
     try {
       return await response.json();
     } catch {
       return await response.text();
     }
   } catch (error) {
-    // Return a structured error object
     return { error: true, message: error.message || "Unknown error" };
   }
 };
@@ -64,28 +61,30 @@ router.post("/", async (req, res) => {
 
     // Check if already following
     const existingFollow = await Follower.findOne({
-      user_id: userId,
-      target_userid,
+      where: { user_id: userId, target_userid },
     });
     if (existingFollow) {
       return res.status(400).json({ error: "Already following this user" });
     }
 
     // Create follow relationship
-    const follow = new Follower({
+    await Follower.create({
+      follow_id: uuidv4(),
       user_id: userId,
       target_userid,
       created_at: new Date(),
     });
-    await follow.save();
 
     // Update user counts (followers/following) in auth-service
     try {
-      await fetchAuth("user", "PUT", userId, { following: 1 });
-      await fetchAuth("user", "PUT", target_userid, { followers: 1 });
+      const followingUpdate = await fetchAuth("user", "PUT", userId, { following: 1 });
+      const followersUpdate = await fetchAuth("user", "PUT", target_userid, { followers: 1 });
+      if (followingUpdate.error || followersUpdate.error) {
+        throw new Error(followingUpdate.message || followersUpdate.message || "Auth service update failed");
+      }
     } catch (error) {
       logger.error(`Follow error: ${error.message}`);
-      res.status(402).json({ error });
+      return res.status(402).json({ error: error.message });
     }
 
     // Clear Redis caches
@@ -113,41 +112,43 @@ router.delete("/:target_userid", async (req, res) => {
     }
 
     // Check if following
-    const follow = await Follower.findOneAndDelete({
-      user_id: userId,
-      target_userid,
+    const deleted = await Follower.destroy({
+      where: { user_id: userId, target_userid },
     });
-    if (!follow) {
+    if (!deleted) {
       return res.status(400).json({ error: "Not following this user" });
     }
 
     // Update user counts in auth-service
     try {
-      await fetchAuth("user", "PUT", userId, { following: -1 });
-      await fetchAuth("user", "PUT", target_userid, { followers: -1 });
+      const followingUpdate = await fetchAuth("user", "PUT", userId, { following: -1 });
+      const followersUpdate = await fetchAuth("user", "PUT", target_userid, { followers: -1 });
+      if (followingUpdate.error || followersUpdate.error) {
+        throw new Error(followingUpdate.message || followersUpdate.message || "Auth service update failed");
+      }
     } catch (error) {
-      logger.error(`Follow error: ${error.message}`);
-      res.status(402).json({ error });
+      logger.error(`Unfollow error: ${error.message}`);
+      return res.status(402).json({ error: error.message });
     }
 
     // Clear Redis caches
     await redis.del(`followers:${target_userid}`);
     await redis.del(`following:${userId}`);
 
-    res.status(200).json({ message: " успешно unfollowed user" });
+    res.status(200).json({ message: "Successfully unfollowed user" });
   } catch (error) {
     logger.error(`Unfollow error: ${error.message}`);
     res.status(500).json({ error: "Internal server error" });
   }
 });
 
+// Check follow status
 router.get("/check/:target_userid", async (req, res) => {
   const { target_userid } = req.params;
   const userId = req.headers["x-user-id"];
   try {
-    // Validate authentication
     if (!userId || !target_userid) {
-      return res.status(401).json({ error: "target_userid ID required" });
+      return res.status(401).json({ error: "User ID and target user ID required" });
     }
     if (userId === target_userid) {
       return res
@@ -157,12 +158,9 @@ router.get("/check/:target_userid", async (req, res) => {
 
     // Query database
     const follow = await Follower.findOne({
-      user_id: userId,
-      target_userid: target_userid,
-    }).lean();
+      where: { user_id: userId, target_userid },
+    });
     const isFollowing = !!follow;
-
-    // Cache result (1 hour)
 
     res.status(200).json({ isFollowing });
   } catch (error) {
@@ -170,6 +168,7 @@ router.get("/check/:target_userid", async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
 
 // Get followers for a user
 // router.get("/:user_id", async (req, res) => {
