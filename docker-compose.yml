@@ -1,0 +1,19 @@
+services:
+  sub-service:
+    image: sub-service:${TAG:-latest}
+    build:
+      context: /root/cent-stage/sub-service
+      dockerfile: Dockerfile
+      cache_from:
+        - sub-service:cache
+    env_file:
+      - /root/cent-stage/sub-service/.env
+    ports:
+      - "3005:3005"
+    networks:
+      - cent-stage-network
+    restart: unless-stopped
+
+networks:
+  cent-stage-network:
+    external: true
