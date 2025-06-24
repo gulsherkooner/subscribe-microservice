@@ -1,6 +1,6 @@
 const express = require("express");
 const redis = require("../config/redis");
-const logger = require("../utils/logger");
+const logger = require("../config/logger");
 const Follower = require("../models/follower");
 const { v4: uuidv4 } = require("uuid");
 
@@ -171,57 +171,61 @@ router.get("/check/:target_userid", async (req, res) => {
 
 
 // Get followers for a user
-// router.get("/:user_id", async (req, res) => {
-//   try {
-//     const { user_id } = req.params;
-//     const cacheKey = `followers:${user_id}`;
+router.get("/:user_id", async (req, res) => {
+  try {
+    const { user_id } = req.params;
+    const cacheKey = `followers:${user_id}`;
 
-//     // Check Redis cache
-//     const cachedFollowers = await redis.get(cacheKey);
-//     if (cachedFollowers) {
-//       return res.status(200).json({ followers: JSON.parse(cachedFollowers) });
-//     }
+    // Check Redis cache
+    const cachedFollowers = await redis.get(cacheKey);
+    if (cachedFollowers) {
+      return res.status(200).json({ followers: JSON.parse(cachedFollowers) });
+    }
 
-//     // Fetch followers from database
-//     const followers = await Follower.find({ target_userid: user_id })
-//       .select("user_id created_at")
-//       .lean();
+    // Fetch followers from database (Sequelize)
+    const followers = await Follower.findAll({
+      where: { target_userid: user_id },
+      attributes: ["user_id", "created_at"],
+      raw: true,
+    });
 
-//     // Cache result
-//     await redis.setex(cacheKey, 3600, JSON.stringify(followers));
+    // Cache result
+    await redis.setex(cacheKey, 3600, JSON.stringify(followers));
 
-//     res.status(200).json({ followers });
-//   } catch (error) {
-//     logger.error(`Get followers error: ${error.message}`);
-//     res.status(500).json({ error: "Internal server error" });
-//   }
-// });
+    res.status(200).json({ followers });
+  } catch (error) {
+    logger.error(`Get followers error: ${error.message}`);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
 
-// // Get users a user is following
-// router.get("/following/:user_id", async (req, res) => {
-//   try {
-//     const { user_id } = req.params;
-//     const cacheKey = `following:${user_id}`;
+// Get users a user is following
+router.get("/following/:user_id", async (req, res) => {
+  try {
+    const { user_id } = req.params;
+    const cacheKey = `following:${user_id}`;
 
-//     // Check Redis cache
-//     const cachedFollowing = await redis.get(cacheKey);
-//     if (cachedFollowing) {
-//       return res.status(200).json({ following: JSON.parse(cachedFollowing) });
-//     }
+    // Check Redis cache
+    const cachedFollowing = await redis.get(cacheKey);
+    if (cachedFollowing) {
+      return res.status(200).json({ following: JSON.parse(cachedFollowing) });
+    }
 
-//     // Fetch following from database
-//     const following = await Follower.find({ user_id })
-//       .select("target_userid created_at")
-//       .lean();
+    // Fetch following from database (Sequelize)
+    const following = await Follower.findAll({
+      where: { user_id },
+      attributes: ["target_userid", "created_at"],
+      raw: true,
+    });
 
-//     // Cache result
-//     await redis.setex(cacheKey, 3600, JSON.stringify(following));
+    // Cache result
+    await redis.setex(cacheKey, 3600, JSON.stringify(following));
 
-//     res.status(200).json({ following });
-//   } catch (error) {
-//     logger.error(`Get following error: ${error.message}`);
-//     res.status(500).json({ error: "Internal server error" });
-//   }
-// });
+    res.status(200).json({ following });
+  } catch (error) {
+    logger.error(`Get following error: ${error.message}`);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
 
 module.exports = router;

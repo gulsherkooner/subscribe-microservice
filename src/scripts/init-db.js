@@ -1,6 +1,8 @@
-require("dotenv").config();
+const dotenv = require('dotenv');
+dotenv.config({ path: require('path').resolve(__dirname, '../../.env') });
 const sequelize = require("../config/db");
-const Follower = require("../models/follower");
+// const Follower = require("../models/follower");
+const Membership = require("../models/membership");
 
 async function initDb() {
   try {
